@@ -26,16 +26,8 @@ object Generators {
       val mTable = MTable(MQName(None, Some(scheme), tableName), "TABLE", null, None, None, None)
       val model = createModel(Seq(mTable), DBConnection.profile)
       val codeGen = new DaoSourceGenerator(model)
-      writeToFile(codeGen, folder, packag, daoClass)
-
-      if (updateFactory) {
-        val fileName = factoryPath.getOrElse(s"$folder/$packag/DaoFactory.scala")
-        val lines = Source.fromFile(fileName).getLines().toList
-        val string = s"  def get$daoClass: I$daoClass = new $daoClass()\n}"
-        val result = lines.slice(0, lines.size - 1).mkString("\n") :: string :: Nil
-        writeResult(fileName, result.mkString("\n"))
-      }
-
+      val code = package(codeGen, packag, daoClass, updateFactory)
+      writeResult(s"$folder/$packag/${codeGen.entity}.scala", code)
     }
 
     private def writeResult(path: String, data: String) {
@@ -45,8 +37,9 @@ object Generators {
     }
 
 
-    def writeToFile(generator: DaoSourceGenerator, folder: String, packag: String, daoClass: String) {
-      val code = s"""package $packag
+    def packageUp(generator: DaoSourceGenerator, packag: String, daoClass: String, genFactory: Boolean) = {
+      val factory = if(genFactory) val string = s"  def get$daoClass: I$daoClass = new $daoClass()" else ""
+      s"""package $packag
 import scala.slick.dao.DBConnection.profile.simple._
 import scala.slick.dao._
 ${generator.code}
@@ -64,8 +57,8 @@ class $daoClass(implicit innerSession: Session) extends I$daoClass {
   def selectById(id: ${generator.pkType}) = {
     for (e <- entities if e.${generator.pkName} === id) yield e
   }
+  $factory
 }"""
-      writeResult(s"$folder/$packag/${generator.entity}.scala", code)
     }
   }
 
